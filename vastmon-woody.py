@@ -26,6 +26,8 @@ MATRIX_CYAN = Fore.CYAN
 MATRIX_RED = Fore.RED
 MATRIX_YELLOW = Fore.YELLOW
 
+CUSTOM_NAME_FILE = "custom_names.json"
+
 def display_splash_screen():
     if platform.system() == "Windows":
         os.system('cls')
@@ -37,7 +39,7 @@ def display_splash_screen():
    _  __           ____  __           __           ___              _      __              __ 
   | |/ /__  ____  / __ )/ /___  _____/ /_______   /   |  __________(_)____/ /_____ _____  / /_
   |   / _ \/ __ \/ __  / / __ \/ ___/ //_/ ___/  / /| | / ___/ ___/ / ___/ __/ __ `/ __ \/ __/
- /   /  __/ / / / /_/ / / /_/ / /__/ ,< (__  )  / ___ |(__  |__  ) (__  ) /_/ /_/ / / / / /_  
+ /   /  __/ / / / /_/ / / /_/ / /__/ ,< (__  )  / ___ |(__  |__  ) / (__  ) /_/ /_/ / / / /_  
 /_/|_\___/_/ /_/_____/_/\____/\___/_/|_/____/  /_/  |_/____/____/_/____/\__/\__,_/_/ /_/\__/  
                                                                                              
 
@@ -98,11 +100,9 @@ def get_woodyminer_stats(miner_address):
         print(f"{MATRIX_BRIGHT_GREEN}Successfully fetched WoodyMiner stats for {len(stats)} workers.{Style.RESET_ALL}")
         return stats
     except requests.RequestException as e:
-        print(f"{MATRIX_RED}Error fetching WoodyMiner stats. Account does not exist: {str(e)}{Style.RESET_ALL}")
+        print(f"{MATRIX_RED}Error fetching WoodyMiner stats: {str(e)}{Style.RESET_ALL}")
     except json.JSONDecodeError:
         print(f"{MATRIX_RED}Error decoding WoodyMiner response{Style.RESET_ALL}")
-    except Exception as e:
-        print(f"{MATRIX_RED}Unexpected error fetching WoodyMiner stats: {str(e)}{Style.RESET_ALL}")
     return []
 
 def display_vast_stats(instances):
@@ -131,7 +131,7 @@ def display_vast_stats(instances):
         status_color = MATRIX_BRIGHT_GREEN if status == 'running' else MATRIX_RED
         
         gpu_usage = instance.get('gpu_util', 'N/A')
-        gpu_usage = f"{float(gpu_usage):.2f}%" if gpu_usage not in ['N/A', None] else "N/A"
+        gpu_usage = f"{int(float(gpu_usage))}%" if gpu_usage not in ['N/A', None] else "N/A"
         gpu_usage_color = MATRIX_RED if gpu_usage != 'N/A' and float(gpu_usage[:-1]) < 20 else MATRIX_GREEN
 
         cpu_usage = instance.get('cpu_util', 'N/A')
@@ -169,7 +169,7 @@ def display_woodyminer_stats(stats, vast_instances):
     table.align = "l"
 
     # Create a mapping of machine IDs to Vast.ai instance statuses
-    vast_statuses = {instance.get('machine_id'): instance.get('actual_status') for instance in vast_instances}
+    vast_statuses = {instance.get('id'): instance.get('actual_status') for instance in vast_instances}
 
     # Sort stats: Online first, then by hashrate
     sorted_stats = sorted(stats, 
@@ -205,6 +205,258 @@ def display_woodyminer_stats(stats, vast_instances):
 
     print(f"\n{MATRIX_BRIGHT_GREEN}WoodyMiner Stats:{Style.RESET_ALL}")
     print(table)
+
+def store_instance_mapping(offer_id, instance_id):
+    """
+    Store the offer ID (custom name) and instance ID in a JSON file for later lookup.
+    """
+    try:
+        with open(CUSTOM_NAME_FILE, "r") as f:
+            instance_mappings = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        instance_mappings = {}
+
+    # Store the mapping of offerId (customName) to instanceId
+    instance_mappings[offer_id] = instance_id
+
+    # Save the updated dictionary to the JSON file
+    with open(CUSTOM_NAME_FILE, "w") as f:
+        json.dump(instance_mappings, f, indent=4)
+
+def get_instance_mapping():
+    """
+    Retrieve the stored instance mappings from the JSON file.
+    """
+    try:
+        with open(CUSTOM_NAME_FILE, "r") as f:
+            instance_mappings = json.load(f)
+            return instance_mappings if isinstance(instance_mappings, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except json.JSONDecodeError:
+        return {}
+
+def create_instance(offer_id, price, gpu_name):
+    """
+    Create a new instance, start WoodyMiner, and store the offerId (customName) and instanceId mapping.
+    """
+    custom_name = str(offer_id)  # Use the offer ID as the custom name
+
+    # Create the startup script to start WoodyMiner with the custom name
+    on_start_script = (
+        f"env >> /etc/environment; "
+        f"sudo apt install screen -y; "
+        f"screen -S woodyminer -X quit 2>/dev/null; "
+        f"screen -dmS woodyminer bash -c \"wget -N https://github.com/woodysoil/XenblocksMiner/releases/download/v1.4.0/xenblocksMiner-1.4.0-linux.tar.gz && "
+        f"tar -zxvf xenblocksMiner-1.4.0-linux.tar.gz --overwrite && "
+        f"chmod +x xenblocksMiner && "
+        f"./xenblocksMiner --minerAddr {ADDR} --totalDevFee 0 --customName {custom_name}\"; "
+        f"screen -r woodyminer"
+    )
+
+    command = [
+        "vastai", "create", "instance", str(offer_id),
+        "--price", str(round(float(price), 4)),
+        "--image", "nvidia/cuda:11.0.3-runtime-ubuntu20.04",
+        "--onstart-cmd", on_start_script,
+        "--disk", "16",
+        "--raw"
+    ]
+
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        if result.stdout:
+            print(f"{MATRIX_BRIGHT_GREEN}Instance created successfully with {gpu_name} at ${price}/hr (Custom Name: {custom_name}){Style.RESET_ALL}")
+            
+            # Parse the instance ID from the result
+            try:
+                instance_data = json.loads(result.stdout)
+                instance_id = str(instance_data.get('new_contract'))  # Extract 'new_contract' as the instance ID
+                if instance_id:
+                    # Store the offer ID and instance ID mapping
+                    store_instance_mapping(offer_id, instance_id)
+                    print(f"{MATRIX_BRIGHT_GREEN}Saved offer ID '{offer_id}' with Instance ID '{instance_id}'.{Style.RESET_ALL}")
+                else:
+                    print(f"{MATRIX_YELLOW}Warning: Could not extract instance ID (new_contract) from the response.{Style.RESET_ALL}")
+            except json.JSONDecodeError:
+                print(f"{MATRIX_YELLOW}Warning: Could not parse the response as JSON.{Style.RESET_ALL}")
+
+            return result.stdout
+    except subprocess.CalledProcessError as e:
+        print(f"{MATRIX_RED}Error executing command: {e}{Style.RESET_ALL}")
+        return None
+
+def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
+    """
+    Merge the data from Vast.ai and WoodyMiner, showing only miners currently in Vast.ai, 
+    and adding a Hashrate/$ column sorted by it, with warnings for low values.
+    """
+    # Load the saved offer ID to instance ID mapping from JSON
+    instance_mapping = get_instance_mapping()
+
+    # Map WoodyMiner stats by the customName (offer ID)
+    woodyminer_by_custom_name = {stat['customName']: stat for stat in woodyminer_stats if stat['customName']}
+
+    table = PrettyTable()
+    table.field_names = [
+        "#", "Instance ID", "GPU Type", "Status", "Cost/hr", "Hashrate", "Hashrate/$", 
+        "XNM", "X.BLK", "Accepted", "Rejected", "CPU Usage", "GPU Usage", "GPU Temp", "Uptime", "SSH Connection"
+    ]
+    table.align = "l"
+
+    merged_data = []
+
+    # Loop over Vast.ai instances
+    for idx, instance in enumerate(vast_instances, 1):
+        instance_id = str(instance.get('id', 'N/A'))  # Vast.ai instance ID
+        gpu_name = instance.get('gpu_name', 'N/A')
+        status = instance.get('actual_status', 'N/A')
+
+        cost_per_hour = instance.get('dph_total', 0)
+        cpu_usage = instance.get('cpu_util', 'N/A')
+        gpu_usage = instance.get('gpu_util', 'N/A')
+        if isinstance(gpu_usage, (float, int)):
+            gpu_usage = f"{int(gpu_usage)}%"  # Convert to integer and add percentage sign
+        elif gpu_usage not in ['N/A', None]:
+            gpu_usage = gpu_usage.replace('%', '').strip()  # Remove any potential percentage sign
+            gpu_usage = f"{int(float(gpu_usage))}%"  # Convert to integer and add percentage sign
+        else:
+            gpu_usage = "N/A"
+        gpu_temp = instance.get('gpu_temp', 'N/A')
+        if isinstance(gpu_temp, (float, int)):
+            gpu_temp = f"{int(gpu_temp)}°C"  # Convert to integer and add the degree Celsius symbol
+        elif gpu_temp not in ['N/A', None]:
+            gpu_temp = gpu_temp.replace('°C', '').strip()  # Remove degree Celsius symbol if present
+            gpu_temp = f"{int(float(gpu_temp))}°C"  # Convert to integer and add the degree Celsius symbol
+        else:
+            gpu_temp = "N/A"
+
+        ip_address = instance.get('ssh_host', 'N/A') + ":" + str(instance.get('ssh_port', 'N/A'))
+
+        # Find the offer ID (custom name) from the instance ID using the mapping
+        offer_id = next((key for key, value in instance_mapping.items() if value == instance_id), None)
+        if offer_id:
+            woodyminer_stat = woodyminer_by_custom_name.get(offer_id)
+
+            if woodyminer_stat:
+                hashrate = float(woodyminer_stat.get('totalHashrate', 0))
+                accepted_blocks = woodyminer_stat.get('acceptedBlocks', 0)
+                rejected_blocks = woodyminer_stat.get('rejectedBlocks', 0)
+                uptime = format_uptime(woodyminer_stat.get('uptime', 0))
+                xnm = woodyminer_stat.get('normalBlocks', 0)
+                xblk = woodyminer_stat.get('superBlocks', 0)
+                woody_status = woodyminer_stat.get('status', 'N/A')
+                status = f"{status} / {woody_status}"
+            else:
+                hashrate = 0
+                accepted_blocks = rejected_blocks = xnm = xblk = 0
+                uptime = "N/A"
+        else:
+            hashrate = 0
+            accepted_blocks = rejected_blocks = xnm = xblk = 0
+            uptime = "N/A"
+
+        # Calculate Hashrate/$ (hashes per dollar)
+        if cost_per_hour > 0:
+            hashrate_per_dollar = hashrate / cost_per_hour
+        else:
+            hashrate_per_dollar = 0
+
+        # Append the instance's merged data for sorting
+        merged_data.append({
+            'index': idx,
+            'instance_id': instance_id,
+            'gpu_name': gpu_name,
+            'status': status,
+            'cost_per_hour': cost_per_hour,
+            'gpu_usage': gpu_usage,
+            'cpu_usage': cpu_usage,
+            'gpu_temp': gpu_temp,
+            'hashrate': hashrate,
+            'accepted_blocks': accepted_blocks,
+            'rejected_blocks': rejected_blocks,
+            'uptime': uptime,
+            'hashrate_per_dollar': hashrate_per_dollar,
+            'xnm': xnm,
+            'xblk': xblk,
+            'ip_address': ip_address
+        })
+
+    # Sort by Hashrate/$ in descending order
+    merged_data.sort(key=lambda x: x['hashrate_per_dollar'], reverse=True)
+
+    total_cost = 0
+    total_hashrate = 0
+    total_hashrate_per_dollar = 0
+    total_accepted = 0
+    total_rejected = 0
+    total_xnm = 0
+    total_xblk = 0
+
+    for idx, data in enumerate(merged_data, 1):
+        # Totals calculation
+        total_cost += data['cost_per_hour']
+        total_hashrate += data['hashrate']
+        total_accepted += data['accepted_blocks']
+        total_rejected += data['rejected_blocks']
+        total_xnm += data['xnm']
+        total_xblk += data['xblk']
+
+        if total_cost > 0:
+            total_hashrate_per_dollar = total_hashrate / total_cost
+
+        # Color logic
+        hashrate_color = MATRIX_RED if data['hashrate'] < 100 else MATRIX_YELLOW if data['hashrate'] < 1000 else MATRIX_GREEN
+        hashrate_dollar_color = MATRIX_RED if data['hashrate_per_dollar'] < 10000 else MATRIX_YELLOW if data['hashrate_per_dollar'] < 30000 else MATRIX_GREEN
+        rejected_color = MATRIX_RED if data['rejected_blocks'] > 0 else MATRIX_GREEN
+        cpu_usage_color = MATRIX_RED if data['cpu_usage'] == 'N/A' or float(data['cpu_usage']) < 10 else MATRIX_YELLOW if float(data['cpu_usage']) < 20 else MATRIX_GREEN
+        gpu_usage_color = MATRIX_RED if data['gpu_usage'] == 'N/A' or float(data['gpu_usage'].replace('%', '')) < 10 else MATRIX_YELLOW if float(data['gpu_usage'].replace('%', '')) < 30 else MATRIX_GREEN
+        gpu_temp_color = MATRIX_RED if data['gpu_temp'] == 'N/A' or float(data['gpu_temp'].replace('°C', '')) > 85 else MATRIX_YELLOW if float(data['gpu_temp'].replace('°C', '')) > 75 else MATRIX_GREEN
+
+        # Add row
+        table.add_row([
+            f"{MATRIX_GREEN}{idx}{Style.RESET_ALL}",
+            f"{MATRIX_GREEN}{data['instance_id']}{Style.RESET_ALL}",
+            f"{MATRIX_GREEN}{data['gpu_name']}{Style.RESET_ALL}",
+            f"{MATRIX_GREEN}{data['status']}{Style.RESET_ALL}",
+            f"{MATRIX_GREEN}${data['cost_per_hour']:.4f}{Style.RESET_ALL}",
+            f"{hashrate_color}{data['hashrate']:.2f} H/s{Style.RESET_ALL}",
+            f"{hashrate_dollar_color}{data['hashrate_per_dollar']:.2f}{Style.RESET_ALL}",
+            f"{MATRIX_GREEN}{data['xnm']}{Style.RESET_ALL}",
+            f"{MATRIX_GREEN}{data['xblk']}{Style.RESET_ALL}",
+            f"{MATRIX_GREEN}{data['accepted_blocks']}{Style.RESET_ALL}",
+            f"{rejected_color}{data['rejected_blocks']}{Style.RESET_ALL}",
+            f"{cpu_usage_color}{int(float(data['cpu_usage']))}%{Style.RESET_ALL}",
+            f"{gpu_usage_color}{data['gpu_usage']}{Style.RESET_ALL}",
+            f"{gpu_temp_color}{data['gpu_temp']}{Style.RESET_ALL}",
+            f"{MATRIX_GREEN}{data['uptime']}{Style.RESET_ALL}",
+            f"{MATRIX_GREEN}{data['ip_address']}{Style.RESET_ALL}"
+        ])
+
+    # Add totals row
+    table.add_row(['-' * len(field) for field in table.field_names])  # Separator row
+    table.add_row([
+        f"{MATRIX_GREEN}TOTAL{Style.RESET_ALL}",
+        f"{MATRIX_GREEN}---{Style.RESET_ALL}",  # Instance ID
+        f"{MATRIX_GREEN}---{Style.RESET_ALL}",  # GPU Type
+        f"{MATRIX_GREEN}---{Style.RESET_ALL}",  # Status
+        f"{MATRIX_GREEN}${total_cost:.4f}{Style.RESET_ALL}",  # Total cost
+        f"{MATRIX_GREEN}{total_hashrate:.2f} H/s{Style.RESET_ALL}",  # Total hashrate
+        f"{MATRIX_GREEN}{total_hashrate_per_dollar:.2f}{Style.RESET_ALL}",  # Total hashrate/$
+        f"{MATRIX_GREEN}{total_xnm}{Style.RESET_ALL}",  # Total XNM
+        f"{MATRIX_GREEN}{total_xblk}{Style.RESET_ALL}",  # Total X.BLK
+        f"{MATRIX_GREEN}{total_accepted}{Style.RESET_ALL}",  # Total Accepted
+        f"{MATRIX_GREEN}{total_rejected}{Style.RESET_ALL}",  # Total Rejected
+        f"{MATRIX_GREEN}---{Style.RESET_ALL}",  # CPU Usage
+        f"{MATRIX_GREEN}---{Style.RESET_ALL}",  # GPU Usage
+        f"{MATRIX_GREEN}---{Style.RESET_ALL}",  # GPU Temp
+        f"{MATRIX_GREEN}---{Style.RESET_ALL}",  # Uptime
+        f"{MATRIX_GREEN}---{Style.RESET_ALL}"   # SSH Connection
+    ])
+
+    print(f"\n{MATRIX_BRIGHT_GREEN}Merged Vast.ai and WoodyMiner Stats (Filtered & Sorted by Hashrate/$):{Style.RESET_ALL}")
+    print(table)
+
 
 def search_top_offers(criterion='dph_total', max_bid=99.99, min_gpus=None, max_gpus=None):
     print(f"{MATRIX_CYAN}Searching for Vast.ai offers...{Style.RESET_ALL}")
@@ -257,37 +509,6 @@ def print_offers(offers):
 
     print(table)
 
-def create_instance(offer_id, price, gpu_name):
-    on_start_script = (
-        f"env >> /etc/environment; "
-        f"sudo apt install screen -y; "
-        f"screen -S woodyminer -X quit 2>/dev/null; "
-        f"screen -dmS woodyminer bash -c \"wget -N https://github.com/woodysoil/XenblocksMiner/releases/download/v1.4.0/xenblocksMiner-1.4.0-linux.tar.gz && "
-        f"tar -zxvf xenblocksMiner-1.4.0-linux.tar.gz --overwrite && "
-        f"chmod +x xenblocksMiner && "
-        f"./xenblocksMiner --minerAddr {ADDR} --totalDevFee 0\"; "
-        f"screen -r woodyminer"
-    )
-
-    command = [
-        "vastai", "create", "instance", str(offer_id),
-        "--price", str(round(float(price), 4)),
-        "--image", "nvidia/cuda:11.0.3-runtime-ubuntu20.04",
-        "--onstart-cmd", on_start_script,
-        "--disk", "16",
-        "--raw"
-    ]
-
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, check=True)
-        if result.stdout:
-            # Print GPU name and price instead of Miner ID
-            print(f"{MATRIX_BRIGHT_GREEN}Instance created successfully with {gpu_name} at ${price}/hr{Style.RESET_ALL}")
-            return result.stdout
-    except subprocess.CalledProcessError as e:
-        print(f"{MATRIX_RED}Error executing command: {e}{Style.RESET_ALL}")
-        return None
-
 def parse_selection(input_str):
     selection = set()
     for part in input_str.split(","):
@@ -339,13 +560,12 @@ def terminate_instances(instances):
         else:
             print(f"{MATRIX_RED}Failed to terminate instance {instance_id}.{Style.RESET_ALL}")
 
-
 def main():
     display_splash_screen()
 
     while True:
         print(f"\n{MATRIX_BRIGHT_GREEN}XenBlocks Mining Assistant - Main Menu:{Style.RESET_ALL}\n")
-        print(f"{MATRIX_CYAN}1. View Mining Network Status{Style.RESET_ALL}")
+        print(f"{MATRIX_CYAN}1. View Mining Network Status (Merged){Style.RESET_ALL}")
         print(f"{MATRIX_CYAN}2. Buy Miners{Style.RESET_ALL}")
         print(f"{MATRIX_CYAN}3. Terminate Miners{Style.RESET_ALL}")
         print(f"{MATRIX_CYAN}4. Exit{Style.RESET_ALL}")
@@ -355,12 +575,14 @@ def main():
         if choice == "1":
             print(f"\n{MATRIX_BRIGHT_GREEN}Fetching mining stats...{Style.RESET_ALL}")
             start_time = time.time()
-            vast_instances = get_vast_instances()
-            woodyminer_stats = get_woodyminer_stats(ADDR)
-            
-            display_vast_stats(vast_instances)
-            display_woodyminer_stats(woodyminer_stats, vast_instances)
-            
+
+            # Fetch data from both APIs
+            vast_instances = get_vast_instances()  # Fetch data from Vast.ai API
+            woodyminer_stats = get_woodyminer_stats(ADDR)  # Fetch data from WoodyMiner API
+
+            # Display merged stats
+            merge_vast_and_woodyminer(vast_instances, woodyminer_stats)
+
             end_time = time.time()
             print(f"\n{MATRIX_BRIGHT_GREEN}Total time to fetch and display stats: {end_time - start_time:.2f} seconds{Style.RESET_ALL}")
 
@@ -410,7 +632,6 @@ def main():
                         if 1 <= index <= len(top_offers):
                             selected_offer = top_offers[index - 1]
                             print(f"{MATRIX_BRIGHT_GREEN}Purchasing offer ID {selected_offer['id']} with {selected_offer['gpu_name']} at ${selected_offer['dph_total']:.3f}/hr...{Style.RESET_ALL}")
-                            # Ensure gpu_name is passed to create_instance
                             create_instance(selected_offer['id'], selected_offer['dph_total'], selected_offer['gpu_name'])
                         else:
                             print(f"{MATRIX_RED}Invalid selection: {index}. Please try again.{Style.RESET_ALL}")
@@ -429,7 +650,6 @@ def main():
 
         else:
             print(f"\n{MATRIX_RED}Invalid choice. Please try again.{Style.RESET_ALL}")
-
 
 if __name__ == "__main__":
     main()

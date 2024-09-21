@@ -6,7 +6,7 @@ Sign up for Vast Cloud GPU Rental here: [Vast.ai Sign-Up](https://cloud.vast.ai/
 
 ## Features
 
-- **Monitor Instance Stats:** Automatically fetch and display key metrics from your mining instances using both Vast.ai and **WoodyMiner** integration.
+- **Monitor Instance Stats:** Fetch and display key metrics from your mining instances using both Vast.ai and **WoodyMiner** integration.
 - **Kill Dead Instances:** Identify and terminate unprofitable instances, cutting unnecessary expenses.
 - **Find New Offers:** Use advanced filtering to uncover the most cost-effective mining opportunities on Vast.ai.
 

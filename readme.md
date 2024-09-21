@@ -1,6 +1,6 @@
 # Vast.ai XenBlocks Mining Assistant - Woody Edition
 
-Welcome to **TreeCityWes.eth's** Vast.ai XenBlocks Mining Assistant - Woody Edition! This Python tool optimizes XenBlocks X1 mining on Vast.ai, helping you monitor instance stats, terminate non-profitable instances, and discover new lucrative offers. It now integrates **WoodyMiner**, providing advanced miner statistics and support.
+Welcome to **TreeCityWes.eth's** Vast.ai XenBlocks Mining Assistant - Woody Edition! This Python tool optimizes XenBlocks X1 mining on Vast.ai, helping you monitor instance stats, terminate non-profitable instances, and search + purchase new offers. It now integrates **WoodyMiner**, providing advanced miner statistics and support.
 
 Sign up for Vast Cloud GPU Rental here: [Vast.ai Sign-Up](https://cloud.vast.ai/?ref_id=130895).
 

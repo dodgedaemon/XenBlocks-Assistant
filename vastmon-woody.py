@@ -225,7 +225,7 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
 
     table = PrettyTable()
     table.field_names = [
-        "#", "Instance ID", "GPU Type", "Total GPUs", "Status", "Cost/hr", "Hashrate", "Hashrate/$", 
+        "#", "Instance ID", "GPU Type", "Count", "Status", "Cost/hr", "Hashrate", "Hashrate/$", 
         "XNM", "X.BLK", "Accepted", "Rejected", "Efficiency", "GPU Usage", "GPU Temp", 
         "Power", "Uptime", "Difficulty", "Last Update", "Version", "Machine ID"
     ]

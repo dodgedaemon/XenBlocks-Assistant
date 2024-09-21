@@ -90,18 +90,6 @@ def run_vastai_command(command):
         print(f"{MATRIX_RED}Error executing command: {e}{Style.RESET_ALL}")
     return None
 
-def get_vast_instances():
-    print(f"\n{MATRIX_CYAN}Fetching Vast.ai instances...{Style.RESET_ALL}")
-    command = ["vastai", "show", "instances", "--raw"]
-    result = run_vastai_command(command)
-    if isinstance(result, list):
-        print(f"{MATRIX_BRIGHT_GREEN}✔  - Successfully fetched {len(result)} Vast.ai instances.{Style.RESET_ALL}")
-        return result
-    else:
-        print(f"{MATRIX_RED}✘  -  Error fetching instances.{Style.RESET_ALL}")
-        return []
-
-def get_woodyminer_stats(miner_address):
     print(f"\n{MATRIX_CYAN}Fetching WoodyMiner stats...{Style.RESET_ALL}")
     url = f"https://woodyminer.com/api/stat/get/{miner_address}"
     try:
@@ -225,7 +213,7 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
 
     table = PrettyTable()
     table.field_names = [
-        "#", "Instance ID", "GPU Type", "Count", "Status", "Cost/hr", "Hashrate", "Hashrate/$", 
+        "#", "Instance ID", "GPU Type", "Total GPUs", "Status", "Cost/hr", "Hashrate", "Hashrate/$", 
         "XNM", "X.BLK", "Accepted", "Rejected", "Efficiency", "GPU Usage", "GPU Temp", 
         "Power", "Uptime", "Difficulty", "Last Update", "Version", "Machine ID"
     ]
@@ -388,7 +376,6 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
 
     print(f"\n{MATRIX_BRIGHT_GREEN}XenBlocks Vast Assistant + WoodyMiner.com Stats:{Style.RESET_ALL}")
     print(table)
-
 
 def search_top_offers(criterion='dph_total', max_bid=99.99, min_gpus=None, max_gpus=None):
     print(f"{MATRIX_CYAN}Searching for Vast.ai offers...{Style.RESET_ALL}")

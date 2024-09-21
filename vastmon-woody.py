@@ -7,18 +7,19 @@ import platform
 from datetime import datetime
 from prettytable import PrettyTable
 from colorama import Fore, Style, init
+from collections import defaultdict
 import uuid
 import time
 
-# Initialize colorama for cross-platform colored output
+ 
 init(autoreset=True)
 
-# Load environment variables from .env
+ 
 load_dotenv()
 API_KEY = os.getenv('API_KEY')
 ADDR = os.getenv('ADDR')
 
-# Define color constants
+ 
 MATRIX_GREEN = Fore.GREEN
 MATRIX_BRIGHT_GREEN = Fore.LIGHTGREEN_EX
 MATRIX_DARK_GREEN = Fore.GREEN + Style.DIM
@@ -152,10 +153,10 @@ def store_instance_mapping(offer_id, instance_id):
     except (FileNotFoundError, json.JSONDecodeError):
         instance_mappings = {}
 
-    # Store the mapping of offerId (customName) to instanceId
+     
     instance_mappings[offer_id] = instance_id
 
-    # Save the updated dictionary to the JSON file
+     
     with open(CUSTOM_NAME_FILE, "w") as f:
         json.dump(instance_mappings, f, indent=4)
 
@@ -173,7 +174,7 @@ def get_instance_mapping():
         return {}
 
 def create_instance(offer_id, price, gpu_name):
-    custom_name = str(offer_id)  # Use the offer ID as the custom name
+    custom_name = str(offer_id)   
 
     on_start_script = (
         f"env >> /etc/environment; "
@@ -224,18 +225,26 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
 
     table = PrettyTable()
     table.field_names = [
-        "#", "Instance ID", "GPU Type", "Status", "Cost/hr", "Hashrate", "Hashrate/$", 
+        "#", "Instance ID", "GPU Type", "Total GPUs", "Status", "Cost/hr", "Hashrate", "Hashrate/$", 
         "XNM", "X.BLK", "Accepted", "Rejected", "Efficiency", "GPU Usage", "GPU Temp", 
         "Power", "Uptime", "Difficulty", "Last Update", "Version", "Machine ID"
     ]
     table.align = "l"
 
     merged_data = []
+    total_gpu_count = 0
+    gpu_counts = defaultdict(int)   
 
-    for idx, instance in enumerate(vast_instances, 1):
+    for instance in vast_instances:
         instance_id = str(instance.get('id', 'N/A'))
         gpu_name = instance.get('gpu_name', 'N/A')
         status = instance.get('actual_status', 'N/A')
+        num_gpus = instance.get('num_gpus', 1)   
+
+        if status == 'running':
+            gpu_counts[gpu_name] += num_gpus   
+            total_gpu_count += num_gpus   
+
         cost_per_hour = instance.get('dph_total', 0)
         
         offer_id = next((key for key, value in instance_mapping.items() if value == instance_id), None)
@@ -268,9 +277,10 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
             uptime = difficulty = total_power = efficiency = last_update = version = machine_id = "N/A"
 
         merged_data.append({
-            'index': idx,
+            'index': len(merged_data) + 1,
             'instance_id': instance_id,
             'gpu_name': gpu_name,
+            'num_gpus': num_gpus,   
             'status': status,
             'cost_per_hour': cost_per_hour,
             'gpu_usage': gpu_usage,
@@ -290,7 +300,7 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
             'machine_id': machine_id
         })
 
-    # Sort by status (running first) and then by hashrate per dollar
+     
     merged_data.sort(key=lambda x: (x['status'] != 'running', -x['hashrate_per_dollar']))
 
     total_cost = 0
@@ -327,6 +337,7 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
             f"{MATRIX_GREEN}{idx}{Style.RESET_ALL}",
             f"{status_color}{data['instance_id']}{Style.RESET_ALL}",
             f"{status_color}{data['gpu_name']}{Style.RESET_ALL}",
+            f"{status_color}{data['num_gpus']}{Style.RESET_ALL}",  
             f"{status_color}{data['status']}{Style.RESET_ALL}",
             f"{status_color}${data['cost_per_hour']:.4f}{Style.RESET_ALL}",
             f"{hashrate_color}{data['hashrate']:.2f} H/s{Style.RESET_ALL}" if data['status'] == 'running' else f"{status_color}N/A{Style.RESET_ALL}",
@@ -354,7 +365,8 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
         f"{MATRIX_GREEN}TOTAL{Style.RESET_ALL}",
         f"{MATRIX_GREEN}---{Style.RESET_ALL}",
         f"{MATRIX_GREEN}---{Style.RESET_ALL}",
-        f"{MATRIX_GREEN}---{Style.RESET_ALL}",
+        f"{MATRIX_GREEN}{total_gpu_count}{Style.RESET_ALL}",  
+        f"{MATRIX_GREEN}---{Style.RESET_ALL}", 
         f"{MATRIX_GREEN}${total_cost:.4f}{Style.RESET_ALL}",
         f"{MATRIX_GREEN}{total_hashrate:.2f} H/s{Style.RESET_ALL}",
         f"{MATRIX_GREEN}{total_hashrate_per_dollar:.2f}{Style.RESET_ALL}",
@@ -373,8 +385,10 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
         f"{MATRIX_GREEN}---{Style.RESET_ALL}"
     ])
 
+
     print(f"\n{MATRIX_BRIGHT_GREEN}XenBlocks Vast Assistant + WoodyMiner.com Stats:{Style.RESET_ALL}")
     print(table)
+
 
 def search_top_offers(criterion='dph_total', max_bid=99.99, min_gpus=None, max_gpus=None):
     print(f"{MATRIX_CYAN}Searching for Vast.ai offers...{Style.RESET_ALL}")
@@ -463,10 +477,10 @@ def terminate_instances(vast_instances, woodyminer_stats):
             'hashrate_per_dollar': hashrate_per_dollar
         })
 
-    # Sort by status (running first) and then by hashrate per dollar
+     
     sorted_data = sorted(merged_data, key=lambda x: (x['instance']['actual_status'] != 'running', -x['hashrate_per_dollar']))
 
-    # Display the sorted instances
+     
     merge_vast_and_woodyminer([item['instance'] for item in sorted_data], woodyminer_stats)
 
     while True:
@@ -482,7 +496,7 @@ def terminate_instances(vast_instances, woodyminer_stats):
         else:
             print(f"{MATRIX_RED}Invalid selection. Please enter valid instance numbers.{Style.RESET_ALL}")
 
-    # Terminate selected instances in the correct order
+     
     for instance in selected_instances:
         instance_id = instance['id']
         print(f"{MATRIX_YELLOW}Terminating instance {instance_id}{Style.RESET_ALL}")
@@ -492,13 +506,13 @@ def terminate_instances(vast_instances, woodyminer_stats):
         if result:
             print(f"{MATRIX_BRIGHT_GREEN}✔ - Successfully terminated {instance_id}{Style.RESET_ALL}")
             
-            # Update instance mapping
+             
             for offer_id, mapped_instance_id in instance_mapping.items():
                 if mapped_instance_id == instance_id:
                     del instance_mapping[offer_id]
                     break
             
-            # Save the updated mapping
+             
             with open(CUSTOM_NAME_FILE, "w") as f:
                 json.dump(instance_mapping, f, indent=4)
             

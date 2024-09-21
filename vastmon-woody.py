@@ -36,17 +36,27 @@ def display_splash_screen():
 
     splash_screen = f"""
 {MATRIX_BRIGHT_GREEN}
-   _  __           ____  __           __           ___              _      __              __ 
-  | |/ /__  ____  / __ )/ /___  _____/ /_______   /   |  __________(_)____/ /_____ _____  / /_
-  |   / _ \/ __ \/ __  / / __ \/ ___/ //_/ ___/  / /| | / ___/ ___/ / ___/ __/ __ `/ __ \/ __/
- /   /  __/ / / / /_/ / / /_/ / /__/ ,< (__  )  / ___ |(__  |__  ) / (__  ) /_/ /_/ / / / /_  
-/_/|_\___/_/ /_/_____/_/\____/\___/_/|_/____/  /_/  |_/____/____/_/____/\__/\__,_/_/ /_/\__/  
-                                                                                             
+
+
+██╗░░██╗███████╗███╗░░██╗██████╗░██╗░░░░░░█████╗░░█████╗░██╗░░██╗░██████╗
+╚██╗██╔╝██╔════╝████╗░██║██╔══██╗██║░░░░░██╔══██╗██╔══██╗██║░██╔╝██╔════╝
+░╚███╔╝░█████╗░░██╔██╗██║██████╦╝██║░░░░░██║░░██║██║░░╚═╝█████═╝░╚█████╗░
+░██╔██╗░██╔══╝░░██║╚████║██╔══██╗██║░░░░░██║░░██║██║░░██╗██╔═██╗░░╚═══██╗
+██╔╝╚██╗███████╗██║░╚███║██████╦╝███████╗╚█████╔╝╚█████╔╝██║░╚██╗██████╔╝
+╚═╝░░╚═╝╚══════╝╚═╝░░╚══╝╚═════╝░╚══════╝░╚════╝░░╚════╝░╚═╝░░╚═╝╚═════╝░
+
+░█████╗░░██████╗░██████╗██╗░██████╗████████╗░█████╗░███╗░░██╗████████╗
+██╔══██╗██╔════╝██╔════╝██║██╔════╝╚══██╔══╝██╔══██╗████╗░██║╚══██╔══╝
+███████║╚█████╗░╚█████╗░██║╚█████╗░░░░██║░░░███████║██╔██╗██║░░░██║░░░
+██╔══██║░╚═══██╗░╚═══██╗██║░╚═══██╗░░░██║░░░██╔══██║██║╚████║░░░██║░░░
+██║░░██║██████╔╝██████╔╝██║██████╔╝░░░██║░░░██║░░██║██║░╚███║░░░██║░░░
+╚═╝░░╚═╝╚═════╝░╚═════╝░╚═╝╚═════╝░░░░╚═╝░░░╚═╝░░╚═╝╚═╝░░╚══╝░░░╚═╝░░░
 
 {MATRIX_DARK_GREEN}Welcome to the XenBlocks Mining Assistant - Woody Edition.
 
     - Create a .env file with Wallet Address and API variables.
-    - Open-source with zero fee collection: https://github.com/TreeCityWes/XenBlocks-Assistant.
+    - Install the Vast.ai SDK and sign in. 
+    - Script is open-source with zero fee collection: https://github.com/TreeCityWes/XenBlocks-Assistant.
     - Woody: https://woodyminer.com/ | Wes: https://www.buymeacoffee.com/treecitywes
 
 {Style.RESET_ALL}"""
@@ -215,7 +225,8 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
     table = PrettyTable()
     table.field_names = [
         "#", "Instance ID", "GPU Type", "Status", "Cost/hr", "Hashrate", "Hashrate/$", 
-        "XNM", "X.BLK", "Accepted", "Rejected", "CPU Usage", "GPU Usage", "GPU Temp", "Uptime"
+        "XNM", "X.BLK", "Accepted", "Rejected", "Efficiency", "GPU Usage", "GPU Temp", 
+        "Power", "Uptime", "Difficulty", "Last Update", "Version", "Machine ID"
     ]
     table.align = "l"
 
@@ -244,11 +255,17 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
             uptime = format_uptime(woodyminer_stat.get('uptime', 0))
             xnm = woodyminer_stat.get('normalBlocks', 0)
             xblk = woodyminer_stat.get('superBlocks', 0)
+            difficulty = woodyminer_stat.get('difficulty', 'N/A')
+            total_power = woodyminer_stat.get('totalPower', 'N/A')
+            efficiency = f"{hashrate / total_power:.2f}" if isinstance(total_power, (int, float)) and total_power > 0 else 'N/A'
+            last_update = woodyminer_stat.get('status', 'N/A').replace('Offline, ', '')
+            version = woodyminer_stat.get('version', 'N/A')
+            machine_id = woodyminer_stat.get('machineId', 'N/A')
         else:
             cpu_usage = gpu_usage = gpu_temp = "N/A"
             hashrate = hashrate_per_dollar = 0
             accepted_blocks = rejected_blocks = xnm = xblk = 0
-            uptime = "N/A"
+            uptime = difficulty = total_power = efficiency = last_update = version = machine_id = "N/A"
 
         merged_data.append({
             'index': idx,
@@ -257,7 +274,6 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
             'status': status,
             'cost_per_hour': cost_per_hour,
             'gpu_usage': gpu_usage,
-            'cpu_usage': cpu_usage,
             'gpu_temp': gpu_temp,
             'hashrate': hashrate,
             'accepted_blocks': accepted_blocks,
@@ -265,7 +281,13 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
             'uptime': uptime,
             'hashrate_per_dollar': hashrate_per_dollar,
             'xnm': xnm,
-            'xblk': xblk
+            'xblk': xblk,
+            'difficulty': difficulty,
+            'total_power': total_power,
+            'efficiency': efficiency,
+            'last_update': last_update,
+            'version': version,
+            'machine_id': machine_id
         })
 
     # Sort by status (running first) and then by hashrate per dollar
@@ -277,6 +299,7 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
     total_rejected = 0
     total_xnm = 0
     total_xblk = 0
+    total_power = 0
 
     for idx, data in enumerate(merged_data, 1):
         if data['status'] == 'running':
@@ -286,17 +309,19 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
             total_rejected += data['rejected_blocks']
             total_xnm += data['xnm']
             total_xblk += data['xblk']
+            if isinstance(data['total_power'], (int, float)):
+                total_power += data['total_power']
 
         if data['status'] == 'running':
             status_color = MATRIX_BRIGHT_GREEN
             hashrate_color = MATRIX_RED if data['hashrate'] < 100 else MATRIX_YELLOW if data['hashrate'] < 1000 else MATRIX_GREEN
             hashrate_dollar_color = MATRIX_RED if data['hashrate_per_dollar'] < 10000 else MATRIX_YELLOW if data['hashrate_per_dollar'] < 30000 else MATRIX_GREEN
             rejected_color = MATRIX_RED if data['rejected_blocks'] > 0 else MATRIX_GREEN
-            cpu_usage_color = MATRIX_RED if data['cpu_usage'] == 'N/A' or int(data['cpu_usage'].replace('%', '')) < 10 else MATRIX_YELLOW if int(data['cpu_usage'].replace('%', '')) < 20 else MATRIX_GREEN
             gpu_usage_color = MATRIX_RED if data['gpu_usage'] == 'N/A' or int(data['gpu_usage'].replace('%', '')) < 10 else MATRIX_YELLOW if int(data['gpu_usage'].replace('%', '')) < 30 else MATRIX_GREEN
             gpu_temp_color = MATRIX_RED if data['gpu_temp'] == 'N/A' or int(data['gpu_temp'].replace('°C', '')) > 85 else MATRIX_YELLOW if int(data['gpu_temp'].replace('°C', '')) > 75 else MATRIX_GREEN
+            efficiency_color = MATRIX_RED if data['efficiency'] == 'N/A' or float(data['efficiency']) < 0.01 else MATRIX_YELLOW if float(data['efficiency']) < 0.02 else MATRIX_GREEN
         else:
-            status_color = hashrate_color = hashrate_dollar_color = rejected_color = cpu_usage_color = gpu_usage_color = gpu_temp_color = MATRIX_RED
+            status_color = hashrate_color = hashrate_dollar_color = rejected_color = gpu_usage_color = gpu_temp_color = efficiency_color = MATRIX_RED
 
         table.add_row([
             f"{MATRIX_GREEN}{idx}{Style.RESET_ALL}",
@@ -310,13 +335,19 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
             f"{status_color}{data['xblk']}{Style.RESET_ALL}",
             f"{status_color}{data['accepted_blocks']}{Style.RESET_ALL}",
             f"{rejected_color}{data['rejected_blocks']}{Style.RESET_ALL}" if data['status'] == 'running' else f"{status_color}0{Style.RESET_ALL}",
-            f"{cpu_usage_color}{data['cpu_usage']}{Style.RESET_ALL}" if data['status'] == 'running' else f"{status_color}N/A{Style.RESET_ALL}",
+            f"{efficiency_color}{data['efficiency']}{Style.RESET_ALL}",
             f"{gpu_usage_color}{data['gpu_usage']}{Style.RESET_ALL}" if data['status'] == 'running' else f"{status_color}N/A{Style.RESET_ALL}",
             f"{gpu_temp_color}{data['gpu_temp']}{Style.RESET_ALL}" if data['status'] == 'running' else f"{status_color}N/A{Style.RESET_ALL}",
-            f"{status_color}{data['uptime']}{Style.RESET_ALL}"
+            f"{status_color}{data['total_power']}{Style.RESET_ALL}",
+            f"{status_color}{data['uptime']}{Style.RESET_ALL}",
+            f"{status_color}{data['difficulty']}{Style.RESET_ALL}",
+            f"{status_color}{data['last_update']}{Style.RESET_ALL}",
+            f"{status_color}{data['version']}{Style.RESET_ALL}",
+            f"{status_color}{data['machine_id']}{Style.RESET_ALL}"
         ])
 
     total_hashrate_per_dollar = total_hashrate / total_cost if total_cost > 0 else 0
+    total_efficiency = total_hashrate / total_power if total_power > 0 else 0
 
     table.add_row(['-' * len(field) for field in table.field_names])
     table.add_row([
@@ -331,6 +362,11 @@ def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
         f"{MATRIX_GREEN}{total_xblk}{Style.RESET_ALL}",
         f"{MATRIX_GREEN}{total_accepted}{Style.RESET_ALL}",
         f"{MATRIX_GREEN}{total_rejected}{Style.RESET_ALL}",
+        f"{MATRIX_GREEN}{total_efficiency:.4f}{Style.RESET_ALL}",
+        f"{MATRIX_GREEN}---{Style.RESET_ALL}",
+        f"{MATRIX_GREEN}---{Style.RESET_ALL}",
+        f"{MATRIX_GREEN}{total_power}{Style.RESET_ALL}",
+        f"{MATRIX_GREEN}---{Style.RESET_ALL}",
         f"{MATRIX_GREEN}---{Style.RESET_ALL}",
         f"{MATRIX_GREEN}---{Style.RESET_ALL}",
         f"{MATRIX_GREEN}---{Style.RESET_ALL}",
@@ -466,14 +502,12 @@ def terminate_instances(vast_instances, woodyminer_stats):
             with open(CUSTOM_NAME_FILE, "w") as f:
                 json.dump(instance_mapping, f, indent=4)
             
-            print(f"{MATRIX_CYAN}ℹ - Updated instance mapping{Style.RESET_ALL}")
+            print(f"{MATRIX_CYAN}ℹ Updated instance mapping{Style.RESET_ALL}")
             print(f"")
         else:
             print(f"{MATRIX_RED}✘ - Failed to terminate {instance_id}{Style.RESET_ALL}")
 
     print(f"{MATRIX_BRIGHT_GREEN}Termination process completed.{Style.RESET_ALL}")
-
-
 
 def main():
     display_splash_screen()

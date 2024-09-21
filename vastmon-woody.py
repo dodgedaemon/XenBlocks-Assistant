@@ -458,34 +458,62 @@ def terminate_instances(vast_instances, woodyminer_stats):
         hashrate = float(woodyminer_stat.get('totalHashrate', 0))
         cost_per_hour = instance.get('dph_total', 0)
         hashrate_per_dollar = hashrate / cost_per_hour if cost_per_hour > 0 else 0
+        accepted_blocks = woodyminer_stat.get('acceptedBlocks', 0)
 
         merged_data.append({
             'instance': instance,
-            'hashrate_per_dollar': hashrate_per_dollar
+            'hashrate_per_dollar': hashrate_per_dollar,
+            'accepted_blocks': accepted_blocks,
+            'status': instance.get('actual_status', 'N/A')
         })
 
-     
     sorted_data = sorted(merged_data, key=lambda x: (x['instance']['actual_status'] != 'running', -x['hashrate_per_dollar']))
 
-     
-    merge_vast_and_woodyminer([item['instance'] for item in sorted_data], woodyminer_stats)
+    # Display the menu for termination options
+    print(f"\n{MATRIX_CYAN}Terminate Instances - Submenu:{Style.RESET_ALL}")
+    print(f"{MATRIX_CYAN}[1]{Style.RESET_ALL} {MATRIX_BRIGHT_GREEN}Kill Specific Instances{Style.RESET_ALL}")
+    print(f"{MATRIX_CYAN}[2]{Style.RESET_ALL} {MATRIX_BRIGHT_GREEN}Kill All Instances{Style.RESET_ALL}")
+    print(f"{MATRIX_CYAN}[3]{Style.RESET_ALL} {MATRIX_BRIGHT_GREEN}Kill Miners With 0 Accepted Blocks{Style.RESET_ALL}")
+    print(f"{MATRIX_CYAN}[4]{Style.RESET_ALL} {MATRIX_BRIGHT_GREEN}Kill All Dead Instances{Style.RESET_ALL}")
+    print(f"{MATRIX_CYAN}[5]{Style.RESET_ALL} {MATRIX_BRIGHT_GREEN}Cancel{Style.RESET_ALL}")
 
-    while True:
-        selection = input(f"\n{MATRIX_CYAN}Enter the number(s) of the instance(s) to terminate (comma-separated), or 'q' to quit: {Style.RESET_ALL}").strip()
-        if selection.lower() == 'q':
-            return
+    choice = input(f"{MATRIX_CYAN}Enter your choice (1-5): {Style.RESET_ALL}").strip()
 
-        selected_indices = parse_selection(selection)
+    if choice == "1":  # Pick instances to kill by number
+        merge_vast_and_woodyminer([item['instance'] for item in sorted_data], woodyminer_stats)
+        while True:
+            selection = input(f"\n{MATRIX_CYAN}Enter the number(s) of the instance(s) to terminate (comma-separated), or 'q' to quit: {Style.RESET_ALL}").strip()
+            if selection.lower() == 'q':
+                return
 
-        if all(1 <= idx <= len(sorted_data) for idx in selected_indices):
-            selected_instances = [sorted_data[idx - 1]['instance'] for idx in selected_indices]
-            break
-        else:
-            print(f"{MATRIX_RED}Invalid selection. Please enter valid instance numbers.{Style.RESET_ALL}")
+            selected_indices = parse_selection(selection)
 
-     
+            if all(1 <= idx <= len(sorted_data) for idx in selected_indices):
+                selected_instances = [sorted_data[idx - 1]['instance'] for idx in selected_indices]
+                break
+            else:
+                print(f"{MATRIX_RED}Invalid selection. Please enter valid instance numbers.{Style.RESET_ALL}")
+
+    elif choice == "2":  # Kill all instances
+        selected_instances = [data['instance'] for data in sorted_data]
+    elif choice == "3":  # Kill miners with 0 accepted blocks
+        selected_instances = [data['instance'] for data in sorted_data if data['accepted_blocks'] == 0]
+    elif choice == "4":  # Kill all instances that are not running
+        selected_instances = [data['instance'] for data in sorted_data if data['status'] != 'running']
+    elif choice == "5":  # Cancel
+        print(f"{MATRIX_GREEN}Operation canceled.{Style.RESET_ALL}")
+        return
+    else:
+        print(f"{MATRIX_RED}Invalid choice. Please select a valid option.{Style.RESET_ALL}")
+        return
+
+    if not selected_instances:
+        print(f"{MATRIX_YELLOW}No instances selected for termination.{Style.RESET_ALL}")
+        return
+
+    # Termination of selected instances
     for instance in selected_instances:
-        instance_id = instance['id']
+        instance_id = instance.get('id', 'N/A')
         print(f"{MATRIX_YELLOW}Terminating instance {instance_id}{Style.RESET_ALL}")
         
         command = ["vastai", "destroy", "instance", str(instance_id)]
@@ -493,13 +521,13 @@ def terminate_instances(vast_instances, woodyminer_stats):
         if result:
             print(f"{MATRIX_BRIGHT_GREEN}✔ - Successfully terminated {instance_id}{Style.RESET_ALL}")
             
-             
+            # Remove terminated instance from the instance mapping
             for offer_id, mapped_instance_id in instance_mapping.items():
                 if mapped_instance_id == instance_id:
                     del instance_mapping[offer_id]
                     break
             
-             
+            # Update the instance mapping file
             with open(CUSTOM_NAME_FILE, "w") as f:
                 json.dump(instance_mapping, f, indent=4)
             
@@ -509,6 +537,7 @@ def terminate_instances(vast_instances, woodyminer_stats):
             print(f"{MATRIX_RED}✘ - Failed to terminate {instance_id}{Style.RESET_ALL}")
 
     print(f"{MATRIX_BRIGHT_GREEN}Termination process completed.{Style.RESET_ALL}")
+
 
 def main():
     display_splash_screen()

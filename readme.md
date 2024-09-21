@@ -1,10 +1,12 @@
-# Vast.ai XenBlocks Mining Assistant
+# Vast.ai XenBlocks Mining Assistant - Woody Edition
 
-Welcome to TreeCityWes.eth's Vast.ai XenBlocks Mining Assistant! This Python tool optimizes XenBlocks X1 mining on Vast.ai, helping you monitor instance stats, terminate non-profitable instances, and discover new lucrative offers. Sign up for Vast Cloud GPU Rental here: https://cloud.vast.ai/?ref_id=130895
+Welcome to **TreeCityWes.eth's** Vast.ai XenBlocks Mining Assistant - Woody Edition! This Python tool optimizes XenBlocks X1 mining on Vast.ai, helping you monitor instance stats, terminate non-profitable instances, and discover new lucrative offers. It now integrates **WoodyMiner**, providing advanced miner statistics and support.
+
+Sign up for Vast Cloud GPU Rental here: [Vast.ai Sign-Up](https://cloud.vast.ai/?ref_id=130895).
 
 ## Features
 
-- **Monitor Instance Stats:** Automatically fetch and display key metrics from your mining instances.
+- **Monitor Instance Stats:** Automatically fetch and display key metrics from your mining instances using both Vast.ai and **WoodyMiner** integration.
 - **Kill Dead Instances:** Identify and terminate unprofitable instances, cutting unnecessary expenses.
 - **Find New Offers:** Use advanced filtering to uncover the most cost-effective mining opportunities on Vast.ai.
 
@@ -13,8 +15,8 @@ Welcome to TreeCityWes.eth's Vast.ai XenBlocks Mining Assistant! This Python too
 ### Prerequisites
 
 - Python 3.6 or later.
-- A Vast.ai API key and wallet address configured via an .env file for secure access.
-
+- A Vast.ai API key and wallet address configured via an `.env` file for secure access.
+- Funded Vast.ai Account 
 ### Setup
 
 1. **Clone the repository:**
@@ -48,45 +50,15 @@ Welcome to TreeCityWes.eth's Vast.ai XenBlocks Mining Assistant! This Python too
 
 Run the script from the command line:
 ```bash
-python vastmon.py
+python vastmon-woody.py
 ```
-
-# Running Image On Local Machine (Baremetal)
-
-Follow these instructions to setup Smit's XenBlocks docker template on baremetal/local machine instead of Vast cloud instance. 
-
-First, install required libraries. See first two steps at https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
-
-Install Docker:
-```bash
-sudo apt install docker.io
-```
-
-After installation, add your user to the Docker group:
-```bash
-sudo usermod -aG docker your_username
-```
-
-Reboot the machine (safest way):
-```bash
-sudo reboot
-```
-
-Execute the Docker command with your Xenblocks address. Make sure to replace 'your_username' with your actual username and 'your_xenblocks_address' with your actual Xenblocks address:
-```bash
-docker run -it -d --restart unless-stopped -p 2222:22 -p 8080:8080 -p 8000:8000 --gpus=all -e ADDR=your_xenblocks_address smit1237/xengpuminer:vast
-```
-
-This command downloads an image (3.7 gigabytes in size) with all you need to mine. After it's done, it will start mining. You can observe a nice and simple web UI on http://your_mining_machine_ip:8080. You can safely reboot the machine; mining will start automatically unless you stop it.
-
 
 ### Support
 
 For support, visit [HashHead.io](https://hashhead.io)
 
 Or Buy Us A Coffee! 
+- Woody: [woodysoil.com](https://woodysoil.com)
 - Smit: [buymeacoffee.com/smit1237](https://buymeacoffee.com/smit1237)
 - Wes: [buymeacoffee.com/treecitywes](https://buymeacoffee.com/treecitywes)
 
-This project is designed to work with Smit1237's XenBlocks Template on Vast.ai. 
-For more details, refer to the template and Docker links provided.

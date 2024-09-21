@@ -84,10 +84,10 @@ def get_vast_instances():
     command = ["vastai", "show", "instances", "--raw"]
     result = run_vastai_command(command)
     if isinstance(result, list):
-        print(f"{MATRIX_BRIGHT_GREEN}✔ Successfully fetched {len(result)} Vast.ai instances.{Style.RESET_ALL}")
+        print(f"{MATRIX_BRIGHT_GREEN}✔  - Successfully fetched {len(result)} Vast.ai instances.{Style.RESET_ALL}")
         return result
     else:
-        print(f"{MATRIX_RED}✘ Error fetching instances.{Style.RESET_ALL}")
+        print(f"{MATRIX_RED}✘  -  Error fetching instances.{Style.RESET_ALL}")
         return []
 
 def get_woodyminer_stats(miner_address):
@@ -97,13 +97,13 @@ def get_woodyminer_stats(miner_address):
         response = requests.get(url)
         response.raise_for_status()
         stats = response.json()
-        print(f"{MATRIX_BRIGHT_GREEN}✔ Successfully fetched WoodyMiner stats for {len(stats)} workers.{Style.RESET_ALL}")
+        print(f"{MATRIX_BRIGHT_GREEN}✔  - Successfully fetched WoodyMiner stats for {len(stats)} workers.{Style.RESET_ALL}")
         print(f"")
         return stats
     except requests.RequestException as e:
-        print(f"{MATRIX_RED}✘ Error fetching WoodyMiner stats: {str(e)}{Style.RESET_ALL}")
+        print(f"{MATRIX_RED}✘  -  Error fetching WoodyMiner stats: {str(e)}{Style.RESET_ALL}")
     except json.JSONDecodeError:
-        print(f"{MATRIX_RED}✘ Error decoding WoodyMiner response{Style.RESET_ALL}")
+        print(f"{MATRIX_RED}✘  -  Error decoding WoodyMiner response{Style.RESET_ALL}")
     return []
 
 def get_vast_instances():
@@ -111,10 +111,10 @@ def get_vast_instances():
     command = ["vastai", "show", "instances", "--raw"]
     result = run_vastai_command(command)
     if isinstance(result, list):
-        print(f"{MATRIX_BRIGHT_GREEN}✔ Successfully fetched {len(result)} Vast.ai instances.{Style.RESET_ALL}")
+        print(f"{MATRIX_BRIGHT_GREEN}✔  - Successfully fetched {len(result)} Vast.ai instances.{Style.RESET_ALL}")
         return result
     else:
-        print(f"{MATRIX_RED}✘ Error fetching instances.{Style.RESET_ALL}")
+        print(f"{MATRIX_RED}✘  -  Error fetching instances.{Style.RESET_ALL}")
         return []
 
 def get_woodyminer_stats(miner_address):
@@ -124,12 +124,12 @@ def get_woodyminer_stats(miner_address):
         response = requests.get(url)
         response.raise_for_status()
         stats = response.json()
-        print(f"{MATRIX_BRIGHT_GREEN}✔ Successfully fetched WoodyMiner stats for {len(stats)} workers.{Style.RESET_ALL}")
+        print(f"{MATRIX_BRIGHT_GREEN}✔  - Successfully fetched WoodyMiner stats for {len(stats)} workers.{Style.RESET_ALL}")
         return stats
     except requests.RequestException as e:
-        print(f"{MATRIX_RED}✘ Error fetching WoodyMiner stats: {str(e)}{Style.RESET_ALL}")
+        print(f"{MATRIX_RED}✘  -  Error fetching WoodyMiner stats: {str(e)}{Style.RESET_ALL}")
     except json.JSONDecodeError:
-        print(f"{MATRIX_RED}✘ Error decoding WoodyMiner response{Style.RESET_ALL}")
+        print(f"{MATRIX_RED}✘  -  Error decoding WoodyMiner response{Style.RESET_ALL}")
     return []
 
 def store_instance_mapping(offer_id, instance_id):
@@ -188,14 +188,14 @@ def create_instance(offer_id, price, gpu_name):
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=True)
         if result.stdout:
-            print(f"{MATRIX_BRIGHT_GREEN}✔ Instance created with {gpu_name} at ${price}/hr (Custom Name: {custom_name}){Style.RESET_ALL}")
+            print(f"{MATRIX_BRIGHT_GREEN}✔  - Instance created with {gpu_name} at ${price}/hr (Custom Name: {custom_name}){Style.RESET_ALL}")
             
             try:
                 instance_data = json.loads(result.stdout)
                 instance_id = str(instance_data.get('new_contract'))
                 if instance_id:
                     store_instance_mapping(offer_id, instance_id)
-                    print(f"{MATRIX_CYAN}ℹ Saved offer ID '{offer_id}' with Instance ID '{instance_id}'.{Style.RESET_ALL}")
+                    print(f"{MATRIX_CYAN}ℹ  - Saved offer ID '{offer_id}' with Instance ID '{instance_id}'.{Style.RESET_ALL}")
                     print(f"")
 
                 else:
@@ -205,7 +205,7 @@ def create_instance(offer_id, price, gpu_name):
 
             return result.stdout
     except subprocess.CalledProcessError as e:
-        print(f"{MATRIX_RED}✘ Error creating instance: {e}{Style.RESET_ALL}")
+        print(f"{MATRIX_RED}✘  -  Error creating instance: {e}{Style.RESET_ALL}")
         return None
 
 def merge_vast_and_woodyminer(vast_instances, woodyminer_stats):
@@ -427,25 +427,26 @@ def terminate_instances(vast_instances, woodyminer_stats):
             'hashrate_per_dollar': hashrate_per_dollar
         })
 
-    sorted_data = sorted(merged_data, key=lambda x: x['hashrate_per_dollar'], reverse=True)
-    sorted_instances = [item['instance'] for item in sorted_data]
+    # Sort by status (running first) and then by hashrate per dollar
+    sorted_data = sorted(merged_data, key=lambda x: (x['instance']['actual_status'] != 'running', -x['hashrate_per_dollar']))
 
-    merge_vast_and_woodyminer(sorted_instances, woodyminer_stats)
-    
+    # Display the sorted instances
+    merge_vast_and_woodyminer([item['instance'] for item in sorted_data], woodyminer_stats)
+
     while True:
-        selection = input(f"\n{MATRIX_CYAN}Enter the number(s) of the instance(s) to terminate (comma-separated), or 'q' to quit: {Style.RESET_ALL}")
-        print(f"")
+        selection = input(f"\n{MATRIX_CYAN}Enter the number(s) of the instance(s) to terminate (comma-separated), or 'q' to quit: {Style.RESET_ALL}").strip()
         if selection.lower() == 'q':
             return
-        
+
         selected_indices = parse_selection(selection)
-        
-        if all(1 <= idx <= len(sorted_instances) for idx in selected_indices):
-            selected_instances = [sorted_instances[idx - 1] for idx in selected_indices]
+
+        if all(1 <= idx <= len(sorted_data) for idx in selected_indices):
+            selected_instances = [sorted_data[idx - 1]['instance'] for idx in selected_indices]
             break
         else:
             print(f"{MATRIX_RED}Invalid selection. Please enter valid instance numbers.{Style.RESET_ALL}")
-    
+
+    # Terminate selected instances in the correct order
     for instance in selected_instances:
         instance_id = instance['id']
         print(f"{MATRIX_YELLOW}Terminating instance {instance_id}{Style.RESET_ALL}")
@@ -453,22 +454,26 @@ def terminate_instances(vast_instances, woodyminer_stats):
         command = ["vastai", "destroy", "instance", str(instance_id)]
         result = run_vastai_command(command)
         if result:
-            print(f"{MATRIX_BRIGHT_GREEN}✔ Successfully terminated{Style.RESET_ALL}")
+            print(f"{MATRIX_BRIGHT_GREEN}✔ - Successfully terminated {instance_id}{Style.RESET_ALL}")
             
+            # Update instance mapping
             for offer_id, mapped_instance_id in instance_mapping.items():
                 if mapped_instance_id == instance_id:
                     del instance_mapping[offer_id]
                     break
             
+            # Save the updated mapping
             with open(CUSTOM_NAME_FILE, "w") as f:
                 json.dump(instance_mapping, f, indent=4)
             
             print(f"{MATRIX_CYAN}ℹ Updated instance mapping{Style.RESET_ALL}")
             print(f"")
         else:
-            print(f"{MATRIX_RED}✘ Failed to terminate{Style.RESET_ALL}")
+            print(f"{MATRIX_RED}✘ - Failed to terminate {instance_id}{Style.RESET_ALL}")
 
-    print(f"\n{MATRIX_BRIGHT_GREEN}Termination process completed.{Style.RESET_ALL}")
+    print(f"{MATRIX_BRIGHT_GREEN}Termination process completed.{Style.RESET_ALL}")
+
+
 
 def main():
     display_splash_screen()

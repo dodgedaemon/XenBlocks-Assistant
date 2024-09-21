@@ -469,7 +469,6 @@ def terminate_instances(vast_instances, woodyminer_stats):
 
     sorted_data = sorted(merged_data, key=lambda x: (x['instance']['actual_status'] != 'running', -x['hashrate_per_dollar']))
 
-    # Display the menu for termination options
     print(f"\n{MATRIX_CYAN}Terminate Instances - Submenu:{Style.RESET_ALL}")
     print(f"{MATRIX_CYAN}[1]{Style.RESET_ALL} {MATRIX_BRIGHT_GREEN}Kill Specific Instances{Style.RESET_ALL}")
     print(f"{MATRIX_CYAN}[2]{Style.RESET_ALL} {MATRIX_BRIGHT_GREEN}Kill All Instances{Style.RESET_ALL}")
@@ -479,7 +478,7 @@ def terminate_instances(vast_instances, woodyminer_stats):
 
     choice = input(f"{MATRIX_CYAN}Enter your choice (1-5): {Style.RESET_ALL}").strip()
 
-    if choice == "1":  # Pick instances to kill by number
+    if choice == "1":  
         merge_vast_and_woodyminer([item['instance'] for item in sorted_data], woodyminer_stats)
         while True:
             selection = input(f"\n{MATRIX_CYAN}Enter the number(s) of the instance(s) to terminate (comma-separated), or 'q' to quit: {Style.RESET_ALL}").strip()
@@ -494,13 +493,13 @@ def terminate_instances(vast_instances, woodyminer_stats):
             else:
                 print(f"{MATRIX_RED}Invalid selection. Please enter valid instance numbers.{Style.RESET_ALL}")
 
-    elif choice == "2":  # Kill all instances
+    elif choice == "2":  
         selected_instances = [data['instance'] for data in sorted_data]
-    elif choice == "3":  # Kill miners with 0 accepted blocks
+    elif choice == "3":  
         selected_instances = [data['instance'] for data in sorted_data if data['accepted_blocks'] == 0]
-    elif choice == "4":  # Kill all instances that are not running
+    elif choice == "4":  
         selected_instances = [data['instance'] for data in sorted_data if data['status'] != 'running']
-    elif choice == "5":  # Cancel
+    elif choice == "5":  
         print(f"{MATRIX_GREEN}Operation canceled.{Style.RESET_ALL}")
         return
     else:
@@ -511,7 +510,6 @@ def terminate_instances(vast_instances, woodyminer_stats):
         print(f"{MATRIX_YELLOW}No instances selected for termination.{Style.RESET_ALL}")
         return
 
-    # Termination of selected instances
     for instance in selected_instances:
         instance_id = instance.get('id', 'N/A')
         print(f"{MATRIX_YELLOW}Terminating instance {instance_id}{Style.RESET_ALL}")
@@ -521,13 +519,11 @@ def terminate_instances(vast_instances, woodyminer_stats):
         if result:
             print(f"{MATRIX_BRIGHT_GREEN}✔ - Successfully terminated {instance_id}{Style.RESET_ALL}")
             
-            # Remove terminated instance from the instance mapping
             for offer_id, mapped_instance_id in instance_mapping.items():
                 if mapped_instance_id == instance_id:
                     del instance_mapping[offer_id]
                     break
             
-            # Update the instance mapping file
             with open(CUSTOM_NAME_FILE, "w") as f:
                 json.dump(instance_mapping, f, indent=4)
             

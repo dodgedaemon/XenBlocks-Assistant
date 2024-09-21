@@ -466,7 +466,7 @@ def terminate_instances(vast_instances, woodyminer_stats):
             with open(CUSTOM_NAME_FILE, "w") as f:
                 json.dump(instance_mapping, f, indent=4)
             
-            print(f"{MATRIX_CYAN}ℹ Updated instance mapping{Style.RESET_ALL}")
+            print(f"{MATRIX_CYAN}ℹ - Updated instance mapping{Style.RESET_ALL}")
             print(f"")
         else:
             print(f"{MATRIX_RED}✘ - Failed to terminate {instance_id}{Style.RESET_ALL}")
